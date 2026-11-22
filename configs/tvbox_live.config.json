@@ -1,0 +1,12 @@
+{
+  "sites": [],
+  "lives": [
+    {
+      "name": "IPTV(盒内本地)",
+      "type": 0,
+      "url": "clan://localhost/iptv/live.txt",
+      "playerType": 0,
+      "timeout": 15
+    }
+  ]
+}
