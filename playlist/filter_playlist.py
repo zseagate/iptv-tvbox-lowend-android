@@ -36,27 +36,18 @@ UA = os.environ.get("IPTV_UA", "VLC/3.0.20 LibVLC/3.0.20")
 # "auto" sends the stream's own origin as Referer (scheme://host/)
 REFERER = os.environ.get("IPTV_REFERER", "")
 READ_EXC = (requests.RequestException, urllib3.exceptions.HTTPError, OSError)
+CACHE_TTL = 6 * 3600          # reuse probe results for 6h
 TIMEOUT = tuple(int(x) for x in os.environ.get("IPTV_TIMEOUT", "5,8").split(","))  # connect, read
 SEG_TIMEOUT = tuple(int(x) for x in os.environ.get("IPTV_SEG_TIMEOUT", "5,6").split(","))
 REACH_TIMEOUT = tuple(int(x) for x in os.environ.get("IPTV_REACH_TIMEOUT", "5,6").split(","))
 WORKERS = int(os.environ.get("IPTV_WORKERS", "32"))
 MIN_BYTES = 1024
 # real-throughput gate: a stream must deliver this much data, at this speed,
-# within the deadline, otherwise it would stutter on the box.
-# All env-overridable so strictness can be relaxed (see README 探活可放宽点):
-#   IPTV_READ_DEADLINE  秒, 分段下载期限 (默认 8.0)
-#   IPTV_MIN_SPEED_BPS  最低吞吐, 未读完时要求 (默认 32KB/s)
-#   IPTV_MIN_ALIVE_BYTES 直链媒体最小字节 (默认 128KB)
-#   IPTV_MIN_CHUNK_BYTES 未读完时最小字节 (默认 512KB)
-#   IPTV_MIN_TINY_BYTES  读完时最小字节 (默认 32KB)
+# within the deadline, otherwise it would stutter on the box
 READ_BUDGET_BYTES = 256 * 1024
-READ_DEADLINE = float(os.environ.get("IPTV_READ_DEADLINE", "8.0"))
-MIN_SPEED_BPS = int(os.environ.get("IPTV_MIN_SPEED_BPS", str(32 * 1024)))
-MIN_ALIVE_BYTES = int(os.environ.get("IPTV_MIN_ALIVE_BYTES", str(128 * 1024)))
-MIN_CHUNK_BYTES = int(os.environ.get("IPTV_MIN_CHUNK_BYTES", str(512 * 1024)))
-MIN_TINY_BYTES = int(os.environ.get("IPTV_MIN_TINY_BYTES", str(32 * 1024)))
-PROBE_DEPTH = int(os.environ.get("IPTV_PROBE_DEPTH", "3"))
-CACHE_TTL = int(os.environ.get("IPTV_CACHE_TTL", str(6 * 3600)))
+READ_DEADLINE = 8.0
+MIN_SPEED_BPS = 32 * 1024
+MIN_ALIVE_BYTES = 128 * 1024
 SKIP_HOSTS = ("youtube.com", "youtu.be", "googlevideo.com") + tuple(
     h for h in os.environ.get("IPTV_SKIP_HOSTS", "").replace(";", ",").split(",") if h
 )
@@ -203,9 +194,9 @@ def _probe_media(url: str, duration: float | None, depth: int) -> tuple[bool, st
     if not complete:
         # reached the size cap: that's fine as long as we got a healthy chunk
         # and the speed is acceptable (live segments can be huge / endless)
-        if got < MIN_CHUNK_BYTES or speed < MIN_SPEED_BPS:
+        if got < 512 * 1024 or speed < MIN_SPEED_BPS:
             return False, f"too slow {got//1024}KB in {deadline:.1f}s ({speed/1024:.0f}KB/s)"
-    if got < MIN_TINY_BYTES:
+    if got < 32 * 1024:
         return False, f"tiny {got//1024}KB"
     return True, f"segment {got//1024}KB in {elapsed:.1f}s ({speed/1024:.0f}KB/s)"
 
@@ -231,7 +222,7 @@ def probe(url: str) -> tuple[bool, str]:
     cur = url
     duration = None
     try:
-        for depth in range(PROBE_DEPTH):
+        for depth in range(3):
             with _fetch(cur) as r:
                 if r.status_code not in (200, 206):
                     return False, f"HTTP {r.status_code}"
@@ -258,7 +249,7 @@ def probe(url: str) -> tuple[bool, str]:
                         got += len(chunk)
                     elapsed = time.monotonic() - start
                     speed = got / elapsed if elapsed else 0
-                    if got < MIN_ALIVE_BYTES:
+                    if got < 128 * 1024:
                         return False, f"media slow {got//1024}KB in {elapsed:.1f}s"
                     if speed < MIN_SPEED_BPS:
                         return False, f"media {speed/1024:.0f}KB/s"
