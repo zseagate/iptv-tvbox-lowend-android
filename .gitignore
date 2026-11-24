@@ -1,4 +1,9 @@
+playlist/merged.m3u
+playlist/*.tsv
+playlist/report.txt
+playlist/verify-report.txt
+playlist/merge*.log
+playlist/probe-cache.json
+scripts/live.txt
+*.tmp
 __pycache__/
-*.pyc
-live.txt
-*.apk

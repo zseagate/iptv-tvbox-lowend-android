@@ -32,8 +32,13 @@
 
 ```
 scripts/   gen_live.py  box_live_setup.sh  serve.sh  tls_probe.sh  vod_probe.sh
+           iptv-refresh-lowend.sh (与高配仓库同款生成管线 -> TVBox 直播 txt)
 configs/   macms_sources.md  tvbox_live.config.json
 docs/      troubleshooting.md  persistence.md
+playlist/  节目源生成方法(从 iptv-tvbox-highend-android 同步):
+           merge_playlists.py(提取+去重+探活+死链过滤+黑名单+重分类+排序+校验)
+           filter/verify/check_live/check_loop/check_content/remove_loop + box-dead.env
+           snapshots/merged-1250-20261124-strict.m3u (严格档 1250 频道快照, 含柯南)
 ```
 
 ## 快速开始
@@ -43,6 +48,19 @@ docs/      troubleshooting.md  persistence.md
 ```bash
 adb connect <盒子IP>:5555            # 需先在盒子"开发者/网络调试"里开 ADB
 adb -s <盒子IP>:5555 shell getprop ro.build.version.sdk   # 期望 19
+```
+
+### 0.5 直播源生成(与高配仓库同款规则) + 一键刷新
+
+低配盒子的直播源用与高配仓库**相同的生成方法**(提取/去重/探活/死链过滤/录播循环剔除/分组排序),
+再经 `gen_live.py` 转成 TVBox 直播 txt 推送:
+
+```bash
+# 生成并推送(需能连到源; 也可直接用仓库里的严格档快照)
+BOX=<盒子IP>:5555 ./scripts/iptv-refresh-lowend.sh
+
+# 直接用 1250 频道严格档快照(2026-11-24, 含柯南)
+BOX=<盒子IP>:5555 ./scripts/box_live_setup.sh playlist/snapshots/merged-1250-20261124-strict.m3u
 ```
 
 ### 1. 直播（TVBox Q 版，本地文件，重启有效）
